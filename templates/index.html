@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.css">
+  <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      margin: 20px;
+    }
+  </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">¡Bienvenido al Torneo!</h1>
+
+        <form id="equiposForm">
+            <div class="form-group">
+                <label for="equipos">Ingresa los nombres de los equipos (uno por línea):</label>
+                <textarea class="form-control" id="equipos" name="equipos" rows="6"></textarea>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="mostrarEquipos()">Mostrar Equipos</button>
+        </form>
+
+        <div id="tablaEquipos" class="tabla-container"></div>
+
+        <script>
+            var equiposArray = []; // Array para almacenar los equipos
+
+            function mostrarEquipos() {
+                var equiposTextarea = document.getElementById("equipos");
+                equiposArray = equiposTextarea.value.split('\n').filter(Boolean);
+
+                if (equiposArray.length !== 20) {
+                    alert("Por favor, ingresa los nombres de los 20 equipos.");
+                    return;
+                }
+
+                mostrarTabla("Equipos Ingresados:", equiposArray, "tablaEquipos");
+            }
+
+            function mostrarTabla(titulo, datos, tablaId) {
+                var tablaHTML = "<h2 class='mt-4'>" + titulo + "</h2>";
+                tablaHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'><tr><th scope='col'>#</th><th scope='col'>Nombre del Equipo</th></tr></thead><tbody>";
+
+                for (var i = 0; i < datos.length; i++) {
+                    tablaHTML += "<tr><th scope='row'>" + (i + 1) + "</th><td>" + datos[i] + "</td></tr>";
+                }
+
+                tablaHTML += "</tbody></table>";
+
+                document.getElementById(tablaId).innerHTML = tablaHTML;
+            }
+        </script>
+
+
+        <button type="button" class="btn btn-success" onclick="generarRonda1()">Ronda 1</button>
+
+        <div id="tablaRonda1" class="tabla-container" style="display: none;"></div>
+
+        <script>
+            function generarRonda1() {
+                var partidosRonda1 = generarPartidosRonda1();
+                var tablaRonda1HTML = "<h2 class='mt-4'>Tabla de Ronda 1</h2>";
+                tablaRonda1HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+                tablaRonda1HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+
+                for (var i = 0; i < partidosRonda1.length; i++) {
+                    tablaRonda1HTML += "<tr>";
+                    tablaRonda1HTML += "<td>" + partidosRonda1[i].partido + "</td>";
+                    tablaRonda1HTML += "<td>" + partidosRonda1[i].equipoA + "</td>";
+                    tablaRonda1HTML += "<td>" + partidosRonda1[i].equipoB + "</td>";
+                    tablaRonda1HTML += "<td><select name='ganadorSelect" + i + "'><option value=''>Seleccionar</option>";
+                    tablaRonda1HTML += "<option value='" + partidosRonda1[i].equipoA + "'>" + partidosRonda1[i].equipoA + "</option>";
+                    tablaRonda1HTML += "<option value='" + partidosRonda1[i].equipoB + "'>" + partidosRonda1[i].equipoB + "</option>";
+                    tablaRonda1HTML += "</select></td>";
+                    tablaRonda1HTML += "</tr>";
+                }
+
+                tablaRonda1HTML += "</tbody></table>";
+                document.getElementById("tablaRonda1").innerHTML = tablaRonda1HTML;
+                document.getElementById("tablaRonda1").style.display = "block";
+            }
+
+            function generarPartidosRonda1() {
+                var partidosRonda1 = [];
+
+                for (var i = 0; i < equiposArray.length / 2; i++) {
+                    var equipoA = equiposArray[i];
+                    var equipoB = equiposArray[19 - i];
+                    var partido = 'Partido ' + (i + 1);
+                    partidosRonda1.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
+                }
+
+                return partidosRonda1;
+            }
+
+            
+        </script>
+
+
+<button type="button" class="btn btn-success" onclick="generarRonda2()">Ronda 2</button>
+
+<div id="tablaRonda2" class="tabla-container" style="display: none;"></div>
+
+<script>
+    function generarRonda2() {
+        var ganadoresRonda1 = obtenerGanadoresRonda1(); // Obtener los ganadores de la Ronda 1
+        var partidosRonda2 = generarPartidosRonda2(ganadoresRonda1);
+
+        var tablaRonda2HTML = "<h2 class='mt-4'>Tabla de Ronda 2</h2>";
+        tablaRonda2HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+        tablaRonda2HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+
+        for (var i = 0; i < partidosRonda2.length; i++) {
+            tablaRonda2HTML += "<tr>";
+            tablaRonda2HTML += "<td>" + partidosRonda2[i].partido + "</td>";
+            tablaRonda2HTML += "<td>" + partidosRonda2[i].equipoA + "</td>";
+            tablaRonda2HTML += "<td>" + partidosRonda2[i].equipoB + "</td>";
+            tablaRonda2HTML += "<td><select name='ganadorSelectRonda2" + i + "'><option value=''>Seleccionar</option>";
+            tablaRonda2HTML += "<option value='" + partidosRonda2[i].equipoA + "'>" + partidosRonda2[i].equipoA + "</option>";
+            tablaRonda2HTML += "<option value='" + partidosRonda2[i].equipoB + "'>" + partidosRonda2[i].equipoB + "</option>";
+            tablaRonda2HTML += "</select></td>";
+            tablaRonda2HTML += "</tr>";
+        }
+
+        tablaRonda2HTML += "</tbody></table>";
+        document.getElementById("tablaRonda2").innerHTML = tablaRonda2HTML;
+        document.getElementById("tablaRonda2").style.display = "block";
+    }
+
+
+
+
+    function obtenerGanadoresRonda1() {
+        var ganadoresRonda1 = [];
+
+        for (var i = 0; i < equiposArray.length / 2; i++) {
+            var ganadorSelect = document.getElementsByName('ganadorSelect' + i)[0];
+            var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
+
+            if (ganador) {
+                ganadoresRonda1.push(ganador);
+            }
+        }
+
+        return ganadoresRonda1;
+    }
+
+    function generarPartidosRonda2(ganadoresRonda1) {
+        var partidosRonda2 = [];
+
+        for (var i = 0; i < ganadoresRonda1.length / 2; i++) {
+            var equipoA = ganadoresRonda1[i];
+            var equipoB = ganadoresRonda1[ganadoresRonda1.length - 1 - i];
+            var partido = 'Partido ' + (i + 1);
+            partidosRonda2.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
+        }
+
+        return partidosRonda2;
+    }
+</script>
+
+<button type="button" class="btn btn-success" onclick="generarRonda3()">Ronda 3</button>
+
+<div id="tablaRonda3" class="tabla-container" style="display: none;"></div>
+
+<script>
+    function generarRonda3() {
+        var ganadoresRonda2 = obtenerGanadoresRonda2(); // Obtener los ganadores de la Ronda 2
+
+        // Verificar que haya al menos un ganador para la Ronda 3
+        if (ganadoresRonda2.length < 1) {
+            alert("Por favor, selecciona al menos un ganador de la Ronda 2.");
+            return;
+        }
+
+        var partidoRonda3 = generarPartidoRonda3(ganadoresRonda2);
+
+        var tablaRonda3HTML = "<h2 class='mt-4'>Tabla de Ronda 3</h2>";
+        tablaRonda3HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+        tablaRonda3HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+
+        tablaRonda3HTML += "<tr>";
+        tablaRonda3HTML += "<td>" + partidoRonda3.partido + "</td>";
+        tablaRonda3HTML += "<td>" + partidoRonda3.equipoA + "</td>";
+        tablaRonda3HTML += "<td>" + partidoRonda3.equipoB + "</td>";
+        tablaRonda3HTML += "<td><select name='ganadorSelectRonda3'><option value=''>Seleccionar</option>";
+        tablaRonda3HTML += "<option value='" + partidoRonda3.equipoA + "'>" + partidoRonda3.equipoA + "</option>";
+        tablaRonda3HTML += "<option value='" + partidoRonda3.equipoB + "'>" + partidoRonda3.equipoB + "</option>";
+        tablaRonda3HTML += "</select></td>";
+        tablaRonda3HTML += "</tr>";
+
+        tablaRonda3HTML += "</tbody></table>";
+        document.getElementById("tablaRonda3").innerHTML = tablaRonda3HTML;
+        document.getElementById("tablaRonda3").style.display = "block";
+    }
+
+    function obtenerGanadoresRonda2() {
+        var ganadoresRonda2 = [];
+
+        for (var i = 0; i < equiposArray.length / 4; i++) {
+            var ganadorSelect = document.getElementsByName('ganadorSelectRonda2' + i)[0];
+            var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
+
+            if (ganador) {
+                ganadoresRonda2.push(ganador);
+            }
+        }
+
+        return ganadoresRonda2;
+    }
+
+    function generarPartidoRonda3(ganadoresRonda2) {
+        // Seleccionar dos equipos aleatorios de los ganadores de la Ronda 2
+        var equipoAIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+        var equipoBIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+
+        // Asegurarse de que no se seleccionen dos veces el mismo equipo
+        while (equipoBIndex === equipoAIndex) {
+            equipoBIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+        }
+
+        var equipoA = ganadoresRonda2[equipoAIndex];
+        var equipoB = ganadoresRonda2[equipoBIndex];
+        var partido = 'Partido 1'; // Solo un partido en la Ronda 3
+
+        return { partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' };
+    }
+</script>
+
+    <!-- Botón para mostrar la Ronda 2 -->
+<!-- Botón para mostrar la Ronda 2 -->
+<button type="button" class="btn btn-success" onclick="generarmostrardia2()">Mostrar Ronda 2</button>
+
+  <!-- Contenedor para la tabla de la Ronda 2 -->
+  <div id="tabladia2" class="tabla-container" style="display: none;"></div>
+  <div id="torneo-container">
+    <div id="torneo"></div>
+  </div>
+<!-- Script JavaScript -->
+<script>
+    function generarmostrardia2() {
+        var ganadoresRonda2 = obtenerGanadoresRonda2(); // Obtener los ganadores de la Ronda 2
+        var perdedorRonda3 = obtenerPerdedorRonda3(); // Obtener el perdedor de la Ronda 3
+
+        // Filtrar al perdedor de la Ronda 3 del array de ganadores de la Ronda 2
+        var ganadoresRonda2Filtrados = ganadoresRonda2.filter(function (equipo) {
+            return equipo !== perdedorRonda3;
+        });
+
+        // Actualizar el array de equipos actuales
+        var equiposArrayd2 = ganadoresRonda2Filtrados;
+
+        // Validar que haya al menos 4 equipos
+        if (equiposArrayd2.length < 4) {
+            alert("Por favor, selecciona al menos 4 equipos para generar el torneo.");
+            return;
+        }
+
+        // Generar el torneo y mostrar equipos actuales
+        console.log(equiposArrayd2);
+        
+        mostrarEquiposActuales(equiposArrayd2);
+        generarTorneo(equiposArrayd2);
+    }
+
+    function generarTorneo(equipos) {
+        // Dividir el array en parejas para el cuadro de torneo
+        var equiposEnParejas = [];
+        for (var i = 0; i < equipos.length; i += 2) {
+            equiposEnParejas.push([equipos[i], equipos[i + 1]]);
+        }
+
+        // Estructura de datos para el cuadro de torneo
+        var data = {
+            teams: equiposEnParejas,
+            results: [
+                [[,],[,]],
+                [[1, 2]],
+                [[,]]
+            ]
+        };
+
+        // Generar el cuadro de torneo utilizando jQuery Bracket
+        $('#torneo').empty(); // Limpiar cualquier contenido previo
+        $('#torneo').bracket({
+            init: data,
+            skipConsolationRound: true,
+            onMatchClick: function (data) {
+                // Manejar clic en un partido (opcional)
+                console.log(data);
+            }
+        });
+    }
+
+
+    function mostrarEquiposActuales(equipos) {
+        var tablaEquiposHTML = "<h2 class='mt-4'>Equipos Actuales</h2>";
+        tablaEquiposHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+        tablaEquiposHTML += "<tr><th scope='col'>#</th><th scope='col'>Nombre del Equipo</th></tr></thead><tbody>";
+
+        for (var i = 0; i < equipos.length; i++) {
+            tablaEquiposHTML += "<tr><th scope='row'>" + (i + 1) + "</th><td>" + equipos[i] + "</td></tr>";
+        }
+
+        tablaEquiposHTML += "</tbody></table>";
+        document.getElementById("tabladia2").innerHTML = tablaEquiposHTML;
+        document.getElementById("tabladia2").style.display = "block";
+    }
+
+    function obtenerPerdedorRonda3() {
+        var ganadorSelectRonda3 = document.getElementsByName('ganadorSelectRonda3')[0];
+        var ganador = ganadorSelectRonda3.value;
+
+        // Obtener todas las opciones del select
+        var opciones = Array.from(ganadorSelectRonda3.options).map(option => option.value);
+
+        // Filtrar las opciones para excluir al ganador seleccionado
+        var perdedores = opciones.filter(opcion => opcion !== '' && opcion !== ganador);
+
+        // Mostrar en consola tanto el ganador seleccionado como los perdedores
+        console.log('Ganador seleccionado:', ganador);
+        console.log('Perdedores:', perdedores);
+
+        var perdedoresString = perdedores.join(', ');
+
+        return perdedoresString; // Trim para eliminar espacios en blanco al principio y al final
+    }
+
+
+    function obtenerGanadoresRonda2() {
+        var ganadoresRonda2 = [];
+
+        for (var i = 0; i < equiposArray.length / 4; i++) {
+            var ganadorSelect = document.getElementsByName('ganadorSelectRonda2' + i)[0];
+            var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
+
+            if (ganador) {
+                ganadoresRonda2.push(ganador);
+            }
+        }
+
+        return ganadoresRonda2;
+    }
+
+    window.onload = function () {
+            var storedContent = localStorage.getItem('htmlContent');
+            if (storedContent) {
+                document.body.innerHTML = storedContent;
+            }
+        };
+
+        // Función para guardar datos localmente antes de recargar la página (F5)
+        window.onbeforeunload = function () {
+            var currentContent = document.body.innerHTML;
+            localStorage.setItem('htmlContent', currentContent);
+        };
+</script>
+
+
+
+    </div>
+</body>
+</html>
+
