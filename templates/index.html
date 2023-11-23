@@ -8,6 +8,7 @@
   <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-bracket/0.11.1/jquery.bracket.min.js"></script>
   <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: 'Arial', sans-serif;
@@ -30,33 +31,134 @@
         <div id="tablaEquipos" class="tabla-container"></div>
 
         <script>
-            var equiposArray = []; // Array para almacenar los equipos
-
+            function enviarDatosAlServidor(datos) {
+                fetch('/guardar_equipos', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ equipos: datos }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Respuesta del servidor:', data);
+                })
+                .catch(error => {
+                    console.error('Error al enviar datos al servidor:', error);
+                });
+            }
+        
             function mostrarEquipos() {
                 var equiposTextarea = document.getElementById("equipos");
-                equiposArray = equiposTextarea.value.split('\n').filter(Boolean);
-
-                if (equiposArray.length !== 20) {
-                    alert("Por favor, ingresa los nombres de los 20 equipos.");
-                    return;
+                var equiposTextAreaValue = equiposTextarea.value.trim();
+        
+                // Verificar si el textarea está vacío
+                if (equiposTextAreaValue === "") {
+                    // Obtener los equipos desde el contexto de Jinja en el HTML
+                    var equiposArray = {{ equipos|tojson|safe }};
+                    
+                    if (equiposArray && equiposArray.length !== 20) {
+                        alert("La cantidad de equipos es incorrecta. Por favor, ingresa los nombres de los 20 equipos.");
+                        return;
+                    }
+        
+                    // Mostrar en la tabla del cliente
+                    var tablaHTML = mostrarTabla("Equipos Ingresados desde la Base de Datos:", equiposArray, "tablaEquipos");
+        
+                    // Enviar datos al servidor Flask y actualizar la tabla
+                    enviarDatosAlServidor(equiposArray);
+        
+                    // Guardar equiposArray y tablaHTML en cookies
+                    guardarEquiposArrayEnCookie(equiposArray);
+                    guardarHTMLTablaEnCookie(tablaHTML);
+                } 
+                else {
+                    // Si el textarea no está vacío, utiliza los datos del textarea
+                    var equiposArray = equiposTextAreaValue.split('\n').filter(Boolean);
+        
+                    if (equiposArray.length !== 20) {
+                        alert("Por favor, ingresa los nombres de los 20 equipos.");
+                        return;
+                    }
+        
+                    // Mostrar en la tabla del cliente
+                    var tablaHTML = mostrarTabla("Equipos Ingresados:", equiposArray, "tablaEquipos");
+        
+                    // Enviar datos al servidor Flask y actualizar la tabla
+                    enviarDatosAlServidor(equiposArray);
+        
+                    // Guardar equiposArray y tablaHTML en cookies
+                    guardarEquiposArrayEnCookie(equiposArray);
+                    guardarHTMLTablaEnCookie(tablaHTML);
                 }
-
-                mostrarTabla("Equipos Ingresados:", equiposArray, "tablaEquipos");
             }
-
+        
             function mostrarTabla(titulo, datos, tablaId) {
                 var tablaHTML = "<h2 class='mt-4'>" + titulo + "</h2>";
                 tablaHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'><tr><th scope='col'>#</th><th scope='col'>Nombre del Equipo</th></tr></thead><tbody>";
-
+        
                 for (var i = 0; i < datos.length; i++) {
                     tablaHTML += "<tr><th scope='row'>" + (i + 1) + "</th><td>" + datos[i] + "</td></tr>";
                 }
-
+        
                 tablaHTML += "</tbody></table>";
-
+        
                 document.getElementById(tablaId).innerHTML = tablaHTML;
+                return tablaHTML;
             }
+        
+            function guardarEquiposArrayEnCookie(equiposArray) {
+                document.cookie = "equiposArray=" + encodeURIComponent(JSON.stringify(equiposArray)) + "; path=/";
+            }
+        
+            function guardarHTMLTablaEnCookie(htmlTabla) {
+                document.cookie = "htmlTabla=" + encodeURIComponent(htmlTabla) + "; path=/";
+            }
+        
+            function obtenerEquiposArrayDesdeCookie() {
+                var name = "equiposArray=";
+                var decodedCookie = decodeURIComponent(document.cookie);
+                var cookieArray = decodedCookie.split(';');
+        
+                for (var i = 0; i < cookieArray.length; i++) {
+                    var cookie = cookieArray[i].trim();
+        
+                    if (cookie.indexOf(name) === 0) {
+                        var equiposArrayStr = decodeURIComponent(cookie.substring(name.length, cookie.length));
+                        return JSON.parse(equiposArrayStr);
+                    }
+                }
+        
+                return null;
+            }
+        
+            function obtenerHTMLTablaDesdeCookie() {
+                var name = "htmlTabla=";
+                var decodedCookie = decodeURIComponent(document.cookie);
+                var cookieArray = decodedCookie.split(';');
+        
+                for (var i = 0; i < cookieArray.length; i++) {
+                    var cookie = cookieArray[i].trim();
+        
+                    if (cookie.indexOf(name) === 0) {
+                        return decodeURIComponent(cookie.substring(name.length, cookie.length));
+                    }
+                }
+        
+                return null;
+            }
+        
+            // Al cargar la página, intentar obtener y mostrar la tabla almacenada en cookies
+            window.onload = function() {
+                var equiposArray = obtenerEquiposArrayDesdeCookie();
+                var tablaHTML = obtenerHTMLTablaDesdeCookie();
+        
+                if (equiposArray && tablaHTML) {
+                    document.getElementById("tablaEquipos").innerHTML = tablaHTML;
+                }
+            };
         </script>
+        
 
 
         <button type="button" class="btn btn-success" onclick="generarRonda1()">Ronda 1</button>
@@ -64,306 +166,496 @@
         <div id="tablaRonda1" class="tabla-container" style="display: none;"></div>
 
         <script>
+            
             function generarRonda1() {
-                var partidosRonda1 = generarPartidosRonda1();
-                var tablaRonda1HTML = "<h2 class='mt-4'>Tabla de Ronda 1</h2>";
-                tablaRonda1HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
-                tablaRonda1HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+                generarPartidosRonda1()
+                    .then(function (partidosRonda1) {
+                        console.log(partidosRonda1);
+                        var tablaRonda1HTML = "<h2 class='mt-4'>Tabla de Ronda 1</h2>";
+                        tablaRonda1HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+                        tablaRonda1HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
 
-                for (var i = 0; i < partidosRonda1.length; i++) {
-                    tablaRonda1HTML += "<tr>";
-                    tablaRonda1HTML += "<td>" + partidosRonda1[i].partido + "</td>";
-                    tablaRonda1HTML += "<td>" + partidosRonda1[i].equipoA + "</td>";
-                    tablaRonda1HTML += "<td>" + partidosRonda1[i].equipoB + "</td>";
-                    tablaRonda1HTML += "<td><select name='ganadorSelect" + i + "'><option value=''>Seleccionar</option>";
-                    tablaRonda1HTML += "<option value='" + partidosRonda1[i].equipoA + "'>" + partidosRonda1[i].equipoA + "</option>";
-                    tablaRonda1HTML += "<option value='" + partidosRonda1[i].equipoB + "'>" + partidosRonda1[i].equipoB + "</option>";
-                    tablaRonda1HTML += "</select></td>";
-                    tablaRonda1HTML += "</tr>";
-                }
+                        for (var i = 0; i < partidosRonda1.length; i++) {
+                            tablaRonda1HTML += "<tr>";
+                            tablaRonda1HTML += "<td>" + partidosRonda1[i].partido + "</td>";
+                            tablaRonda1HTML += "<td>" + partidosRonda1[i].equipoA + "</td>";
+                            tablaRonda1HTML += "<td>" + partidosRonda1[i].equipoB + "</td>";
+                            tablaRonda1HTML += "<td><select name='ganadorSelect" + i + "'><option value=''>Seleccionar</option>";
+                            tablaRonda1HTML += "<option value='" + partidosRonda1[i].equipoA + "'>" + partidosRonda1[i].equipoA + "</option>";
+                            tablaRonda1HTML += "<option value='" + partidosRonda1[i].equipoB + "'>" + partidosRonda1[i].equipoB + "</option>";
+                            tablaRonda1HTML += "</select></td>";
+                            tablaRonda1HTML += "</tr>";
+                        }
 
-                tablaRonda1HTML += "</tbody></table>";
-                document.getElementById("tablaRonda1").innerHTML = tablaRonda1HTML;
-                document.getElementById("tablaRonda1").style.display = "block";
+                        tablaRonda1HTML += "</tbody></table>";
+                        document.getElementById("tablaRonda1").innerHTML = tablaRonda1HTML;
+                        document.getElementById("tablaRonda1").style.display = "block";
+                    })
+                    .catch(function (error) {
+                        console.error('Error al generar la Ronda 1:', error);
+                    });
             }
 
             function generarPartidosRonda1() {
-                var partidosRonda1 = [];
+                return new Promise(function (resolve, reject) {
+                    obtenerEquiposDesdeFlask()
+                        .done(function (data) {
+                            if (data && data.equipos) {
+                                var equiposArray = data.equipos;
+                                console.log(equiposArray);
 
-                for (var i = 0; i < equiposArray.length / 2; i++) {
-                    var equipoA = equiposArray[i];
-                    var equipoB = equiposArray[19 - i];
-                    var partido = 'Partido ' + (i + 1);
-                    partidosRonda1.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
-                }
+                                var partidosRonda1 = [];
 
-                return partidosRonda1;
+                                for (var i = 0; i < equiposArray.length / 2; i++) {
+                                    var equipoA = equiposArray[i];
+                                    var equipoB = equiposArray[19 - i];
+                                    var partido = 'Partido ' + (i + 1);
+                                    partidosRonda1.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
+                                }
+                                console.log(partidosRonda1);
+
+                                resolve(partidosRonda1);
+                            } else {
+                                console.error('No se pudieron obtener los equipos.');
+                                reject('No se pudieron obtener los equipos.');
+                            }
+                        })
+                        .fail(function (error) {
+                            console.error('Error al obtener equipos:', error);
+                            reject('Error al obtener equipos.');
+                        });
+                });
             }
+
+
+            function obtenerEquiposDesdeFlask() {
+                return $.ajax({
+                    url: '/obtener_equipos',
+                    type: 'GET',
+                    dataType: 'json',
+                });
+            }
+
+            
 
             
         </script>
 
 
-<button type="button" class="btn btn-success" onclick="generarRonda2()">Ronda 2</button>
+    <button type="button" class="btn btn-success" onclick="generarRonda2()">Ronda 2</button>
 
-<div id="tablaRonda2" class="tabla-container" style="display: none;"></div>
+    <div id="tablaRonda2" class="tabla-container" style="display: none;"></div>
 
-<script>
-    function generarRonda2() {
-        var ganadoresRonda1 = obtenerGanadoresRonda1(); // Obtener los ganadores de la Ronda 1
-        var partidosRonda2 = generarPartidosRonda2(ganadoresRonda1);
+    <script>
+        function generarRonda2() {
+            var ganadoresRonda1 = obtenerGanadoresRonda1(); // Obtener los ganadores de la Ronda 1
+            var partidosRonda2 = generarPartidosRonda2(ganadoresRonda1);
 
-        var tablaRonda2HTML = "<h2 class='mt-4'>Tabla de Ronda 2</h2>";
-        tablaRonda2HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
-        tablaRonda2HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+            var tablaRonda2HTML = "<h2 class='mt-4'>Tabla de Ronda 2</h2>";
+            tablaRonda2HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+            tablaRonda2HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
 
-        for (var i = 0; i < partidosRonda2.length; i++) {
-            tablaRonda2HTML += "<tr>";
-            tablaRonda2HTML += "<td>" + partidosRonda2[i].partido + "</td>";
-            tablaRonda2HTML += "<td>" + partidosRonda2[i].equipoA + "</td>";
-            tablaRonda2HTML += "<td>" + partidosRonda2[i].equipoB + "</td>";
-            tablaRonda2HTML += "<td><select name='ganadorSelectRonda2" + i + "'><option value=''>Seleccionar</option>";
-            tablaRonda2HTML += "<option value='" + partidosRonda2[i].equipoA + "'>" + partidosRonda2[i].equipoA + "</option>";
-            tablaRonda2HTML += "<option value='" + partidosRonda2[i].equipoB + "'>" + partidosRonda2[i].equipoB + "</option>";
-            tablaRonda2HTML += "</select></td>";
-            tablaRonda2HTML += "</tr>";
-        }
-
-        tablaRonda2HTML += "</tbody></table>";
-        document.getElementById("tablaRonda2").innerHTML = tablaRonda2HTML;
-        document.getElementById("tablaRonda2").style.display = "block";
-    }
-
-
-
-
-    function obtenerGanadoresRonda1() {
-        var ganadoresRonda1 = [];
-
-        for (var i = 0; i < equiposArray.length / 2; i++) {
-            var ganadorSelect = document.getElementsByName('ganadorSelect' + i)[0];
-            var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
-
-            if (ganador) {
-                ganadoresRonda1.push(ganador);
+            for (var i = 0; i < partidosRonda2.length; i++) {
+                tablaRonda2HTML += "<tr>";
+                tablaRonda2HTML += "<td>" + partidosRonda2[i].partido + "</td>";
+                tablaRonda2HTML += "<td>" + partidosRonda2[i].equipoA + "</td>";
+                tablaRonda2HTML += "<td>" + partidosRonda2[i].equipoB + "</td>";
+                tablaRonda2HTML += "<td><select name='ganadorSelectRonda2" + i + "'><option value=''>Seleccionar</option>";
+                tablaRonda2HTML += "<option value='" + partidosRonda2[i].equipoA + "'>" + partidosRonda2[i].equipoA + "</option>";
+                tablaRonda2HTML += "<option value='" + partidosRonda2[i].equipoB + "'>" + partidosRonda2[i].equipoB + "</option>";
+                tablaRonda2HTML += "</select></td>";
+                tablaRonda2HTML += "</tr>";
             }
+
+            tablaRonda2HTML += "</tbody></table>";
+            document.getElementById("tablaRonda2").innerHTML = tablaRonda2HTML;
+            document.getElementById("tablaRonda2").style.display = "block";
         }
 
-        return ganadoresRonda1;
-    }
 
-    function generarPartidosRonda2(ganadoresRonda1) {
-        var partidosRonda2 = [];
 
-        for (var i = 0; i < ganadoresRonda1.length / 2; i++) {
-            var equipoA = ganadoresRonda1[i];
-            var equipoB = ganadoresRonda1[ganadoresRonda1.length - 1 - i];
-            var partido = 'Partido ' + (i + 1);
-            partidosRonda2.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
-        }
 
-        return partidosRonda2;
-    }
-</script>
+        function obtenerGanadoresRonda1() {
+            var ganadoresRonda1 = [];
 
-<button type="button" class="btn btn-success" onclick="generarRonda3()">Ronda 3</button>
+            for (var i = 0; i < equiposArray.length / 2; i++) {
+                var ganadorSelect = document.getElementsByName('ganadorSelect' + i)[0];
+                var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
 
-<div id="tablaRonda3" class="tabla-container" style="display: none;"></div>
-
-<script>
-    function generarRonda3() {
-        var ganadoresRonda2 = obtenerGanadoresRonda2(); // Obtener los ganadores de la Ronda 2
-
-        // Verificar que haya al menos un ganador para la Ronda 3
-        if (ganadoresRonda2.length < 1) {
-            alert("Por favor, selecciona al menos un ganador de la Ronda 2.");
-            return;
-        }
-
-        var partidoRonda3 = generarPartidoRonda3(ganadoresRonda2);
-
-        var tablaRonda3HTML = "<h2 class='mt-4'>Tabla de Ronda 3</h2>";
-        tablaRonda3HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
-        tablaRonda3HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
-
-        tablaRonda3HTML += "<tr>";
-        tablaRonda3HTML += "<td>" + partidoRonda3.partido + "</td>";
-        tablaRonda3HTML += "<td>" + partidoRonda3.equipoA + "</td>";
-        tablaRonda3HTML += "<td>" + partidoRonda3.equipoB + "</td>";
-        tablaRonda3HTML += "<td><select name='ganadorSelectRonda3'><option value=''>Seleccionar</option>";
-        tablaRonda3HTML += "<option value='" + partidoRonda3.equipoA + "'>" + partidoRonda3.equipoA + "</option>";
-        tablaRonda3HTML += "<option value='" + partidoRonda3.equipoB + "'>" + partidoRonda3.equipoB + "</option>";
-        tablaRonda3HTML += "</select></td>";
-        tablaRonda3HTML += "</tr>";
-
-        tablaRonda3HTML += "</tbody></table>";
-        document.getElementById("tablaRonda3").innerHTML = tablaRonda3HTML;
-        document.getElementById("tablaRonda3").style.display = "block";
-    }
-
-    function obtenerGanadoresRonda2() {
-        var ganadoresRonda2 = [];
-
-        for (var i = 0; i < equiposArray.length / 4; i++) {
-            var ganadorSelect = document.getElementsByName('ganadorSelectRonda2' + i)[0];
-            var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
-
-            if (ganador) {
-                ganadoresRonda2.push(ganador);
+                if (ganador) {
+                    ganadoresRonda1.push(ganador);
+                }
             }
+
+            return ganadoresRonda1;
         }
 
-        return ganadoresRonda2;
-    }
+        function generarPartidosRonda2(ganadoresRonda1) {
+            var partidosRonda2 = [];
 
-    function generarPartidoRonda3(ganadoresRonda2) {
-        // Seleccionar dos equipos aleatorios de los ganadores de la Ronda 2
-        var equipoAIndex = Math.floor(Math.random() * ganadoresRonda2.length);
-        var equipoBIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+            for (var i = 0; i < ganadoresRonda1.length / 2; i++) {
+                var equipoA = ganadoresRonda1[i];
+                var equipoB = ganadoresRonda1[ganadoresRonda1.length - 1 - i];
+                var partido = 'Partido ' + (i + 1);
+                partidosRonda2.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
+            }
 
-        // Asegurarse de que no se seleccionen dos veces el mismo equipo
-        while (equipoBIndex === equipoAIndex) {
-            equipoBIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+            return partidosRonda2;
+        }
+    </script>
+
+    <button type="button" class="btn btn-success" onclick="generarRonda3()">Ronda 3</button>
+
+    <div id="tablaRonda3" class="tabla-container" style="display: none;"></div>
+
+    <script>
+        function generarRonda3() {
+            var ganadoresRonda2 = obtenerGanadoresRonda2(); // Obtener los ganadores de la Ronda 2
+
+            // Verificar que haya al menos un ganador para la Ronda 3
+            if (ganadoresRonda2.length < 1) {
+                alert("Por favor, selecciona al menos un ganador de la Ronda 2.");
+                return;
+            }
+
+            var partidoRonda3 = generarPartidoRonda3(ganadoresRonda2);
+
+            var tablaRonda3HTML = "<h2 class='mt-4'>Tabla de Ronda 3</h2>";
+            tablaRonda3HTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+            tablaRonda3HTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+
+            tablaRonda3HTML += "<tr>";
+            tablaRonda3HTML += "<td>" + partidoRonda3.partido + "</td>";
+            tablaRonda3HTML += "<td>" + partidoRonda3.equipoA + "</td>";
+            tablaRonda3HTML += "<td>" + partidoRonda3.equipoB + "</td>";
+            tablaRonda3HTML += "<td><select name='ganadorSelectRonda3'><option value=''>Seleccionar</option>";
+            tablaRonda3HTML += "<option value='" + partidoRonda3.equipoA + "'>" + partidoRonda3.equipoA + "</option>";
+            tablaRonda3HTML += "<option value='" + partidoRonda3.equipoB + "'>" + partidoRonda3.equipoB + "</option>";
+            tablaRonda3HTML += "</select></td>";
+            tablaRonda3HTML += "</tr>";
+
+            tablaRonda3HTML += "</tbody></table>";
+            document.getElementById("tablaRonda3").innerHTML = tablaRonda3HTML;
+            document.getElementById("tablaRonda3").style.display = "block";
         }
 
-        var equipoA = ganadoresRonda2[equipoAIndex];
-        var equipoB = ganadoresRonda2[equipoBIndex];
-        var partido = 'Partido 1'; // Solo un partido en la Ronda 3
+        function obtenerGanadoresRonda2() {
+            var ganadoresRonda2 = [];
 
-        return { partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' };
-    }
-</script>
+            for (var i = 0; i < equiposArray.length / 4; i++) {
+                var ganadorSelect = document.getElementsByName('ganadorSelectRonda2' + i)[0];
+                var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
+
+                if (ganador) {
+                    ganadoresRonda2.push(ganador);
+                }
+            }
+
+            return ganadoresRonda2;
+        }
+
+        function generarPartidoRonda3(ganadoresRonda2) {
+            // Seleccionar dos equipos aleatorios de los ganadores de la Ronda 2
+            var equipoAIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+            var equipoBIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+
+            // Asegurarse de que no se seleccionen dos veces el mismo equipo
+            while (equipoBIndex === equipoAIndex) {
+                equipoBIndex = Math.floor(Math.random() * ganadoresRonda2.length);
+            }
+
+            var equipoA = ganadoresRonda2[equipoAIndex];
+            var equipoB = ganadoresRonda2[equipoBIndex];
+            var partido = 'Partido 1'; // Solo un partido en la Ronda 3
+
+            return { partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' };
+        }
+    </script>
 
     <!-- Botón para mostrar la Ronda 2 -->
-<!-- Botón para mostrar la Ronda 2 -->
-<button type="button" class="btn btn-success" onclick="generarmostrardia2()">Mostrar Ronda 2</button>
+    <!-- Botón para mostrar la Ronda 2 -->
+    <hr class="my-4"> <!-- Línea divisoria -->
+    <button type="button" class="btn btn-primary" onclick="generarmostrardia2()">Mostrar dia 2</button>
 
-  <!-- Contenedor para la tabla de la Ronda 2 -->
-  <div id="tabladia2" class="tabla-container" style="display: none;"></div>
-  <div id="torneo-container">
-    <div id="torneo"></div>
-  </div>
-<!-- Script JavaScript -->
+    <!-- Contenedor para la tabla de la Ronda 2 -->
+    <div id="tabladia2" class="tabla-container" style="display: none;"></div>
+    <div id="torneo-container">
+        <div id="torneo"></div>
+    </div>
+    <div id="TABLASEMIFINAL" class="tabla-container" style="display: none;"></div>
+
+    <!-- Script JavaScript -->
+    <script>
+        function generarmostrardia2() {
+            // Obtener los ganadores de la Ronda 2
+            var ganadoresRonda2 = obtenerGanadoresRonda2();
+
+            // Obtener el perdedor de la Ronda 3
+            var perdedorRonda3 = obtenerPerdedorRonda3();
+
+            // Filtrar al perdedor de la Ronda 3 del array de ganadores de la Ronda 2
+            var ganadoresRonda2Filtrados = ganadoresRonda2.filter(function (equipo) {
+                return equipo !== perdedorRonda3;
+            });
+
+            // Actualizar el array de equipos actuales
+            var equiposArrayd2 = ganadoresRonda2Filtrados;
+
+            // Validar que haya al menos 4 equipos
+            if (equiposArrayd2.length < 4) {
+                alert("Por favor, selecciona al menos 4 equipos para generar el torneo.");
+                return;
+            }
+
+            // Generar el torneo y mostrar equipos actuales
+            console.log(equiposArrayd2);
+
+            mostrarEquiposActuales(equiposArrayd2);
+            generarTorneo(equiposArrayd2);
+        }
+
+        function generarTorneo(equipos) {
+            // Barajar los equipos aleatoriamente
+            equipos = shuffle(equipos);
+            var partidos = generarPartidosRonda(equipos);
+
+            // Generar tabla HTML
+            var otraTablaHTML = "<br><br><h2 class='mt-4'>Tabla de Semifinal</h2>";
+            otraTablaHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+            otraTablaHTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+
+            for (var i = 0; i < partidos.length; i++) {
+                otraTablaHTML += "<tr>";
+                otraTablaHTML += "<td>" + partidos[i].partido + "</td>";
+                otraTablaHTML += "<td>" + partidos[i].equipoA + "</td>";
+                otraTablaHTML += "<td>" + partidos[i].equipoB + "</td>";
+                otraTablaHTML += "<td><select name='ganadorSelectSemifinal" + i + "'><option value=''>Seleccionar</option>";
+                otraTablaHTML += "<option value='" + partidos[i].equipoA + "'>" + partidos[i].equipoA + "</option>";
+                otraTablaHTML += "<option value='" + partidos[i].equipoB + "'>" + partidos[i].equipoB + "</option>";
+                otraTablaHTML += "</select></td>";
+                otraTablaHTML += "</tr>";
+            }
+
+            otraTablaHTML += "</tbody></table>";
+            document.getElementById("TABLASEMIFINAL").innerHTML = otraTablaHTML;
+            document.getElementById("TABLASEMIFINAL").style.display = "block";
+
+            // Dividir el array en parejas para el cuadro de torneo
+            var equiposEnParejas = [];
+            for (var i = 0; i < equipos.length; i += 2) {
+                equiposEnParejas.push([equipos[i], equipos[i + 1]]);
+            }
+
+            // Estructura de datos para el cuadro de torneo
+            var data = {
+                teams: equiposEnParejas,
+                results: [
+                    [[,], [,]],
+                    [[,], [,]],
+                    [[,], [,]],
+                    [[,], [,]],
+                    [[1, 2], [3, 4]],
+                    [[,], [,]]
+                ]
+            };
+
+            // Generar el cuadro de torneo utilizando jQuery Bracket
+            $('#torneo').empty(); // Limpiar cualquier contenido previo
+            $('#torneo').bracket({
+                init: data,
+                skipConsolationRound: true,
+                onMatchClick: function (data) {
+                    // Manejar clic en un partido (opcional)
+                    console.log(data);
+                }
+            });
+        }
+
+        function generarPartidosRonda(equipos) {
+            var partidos = [];
+
+            for (var i = 0; i < equipos.length / 2; i++) {
+                var equipoA = equipos[i * 2];
+                var equipoB = equipos[i * 2 + 1];
+                var partido = 'Partido ' + (i + 1);
+                partidos.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
+            }
+
+            return partidos;
+        }
+
+
+
+        // Función para barajar un array (algoritmo de Fisher-Yates)
+        function shuffle(array) {
+            var currentIndex = array.length, randomIndex;
+
+            // Mientras haya elementos para barajar
+            while (currentIndex != 0) {
+                // Seleccionar un elemento sin barajar
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex--;
+
+                // Intercambiar el elemento seleccionado con el último elemento sin barajar
+                [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+            }
+
+            return array;
+        }
+
+        function mostrarEquiposActuales(equipos) {
+            var tablaEquiposHTML = "<h2 class='mt-4'>Equipos Actuales</h2>";
+            tablaEquiposHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+            tablaEquiposHTML += "<tr><th scope='col'>#</th><th scope='col'>Nombre del Equipo</th></tr></thead><tbody>";
+
+            for (var i = 0; i < equipos.length; i++) {
+                tablaEquiposHTML += "<tr><th scope='row'>" + (i + 1) + "</th><td>" + equipos[i] + "</td></tr>";
+            }
+
+            tablaEquiposHTML += "</tbody></table>";
+            document.getElementById("tabladia2").innerHTML = tablaEquiposHTML;
+            document.getElementById("tabladia2").style.display = "block";
+        }
+
+        function obtenerPerdedorRonda3() {
+            var ganadorSelectRonda3 = document.getElementsByName('ganadorSelectRonda3')[0];
+            var ganador = ganadorSelectRonda3.value;
+
+            // Obtener todas las opciones del select
+            var opciones = Array.from(ganadorSelectRonda3.options).map(option => option.value);
+
+            // Filtrar las opciones para excluir al ganador seleccionado
+            var perdedores = opciones.filter(opcion => opcion !== '' && opcion !== ganador);
+
+            // Mostrar en consola tanto el ganador seleccionado como los perdedores
+            console.log('Ganador seleccionado:', ganador);
+            console.log('Perdedores:', perdedores);
+
+            var perdedoresString = perdedores.join(', ');
+
+            return perdedoresString; // Trim para eliminar espacios en blanco al principio y al final
+        }
+
+        function obtenerGanadoresRonda2() {
+            var ganadoresRonda2 = [];
+
+            for (var i = 0; i < equiposArray.length / 4; i++) {
+                var ganadorSelect = document.getElementsByName('ganadorSelectRonda2' + i)[0];
+                var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
+
+                if (ganador) {
+                    ganadoresRonda2.push(ganador);
+                }
+            }
+
+            return ganadoresRonda2;
+        }
+    </script>
+
+<button type="button" class="btn btn-success" onclick="generarFinal()">Final</button>
+
+<div id="Final" class="tabla-container" style="display: none;"></div>
+
 <script>
-    function generarmostrardia2() {
-        var ganadoresRonda2 = obtenerGanadoresRonda2(); // Obtener los ganadores de la Ronda 2
-        var perdedorRonda3 = obtenerPerdedorRonda3(); // Obtener el perdedor de la Ronda 3
+    function generarFinal() {
+        var ganadoresRondaSemifinal = obtenerGanadoresRondaSemifinal(); // Obtener los ganadores de la Ronda Semifinal
 
-        // Filtrar al perdedor de la Ronda 3 del array de ganadores de la Ronda 2
-        var ganadoresRonda2Filtrados = ganadoresRonda2.filter(function (equipo) {
-            return equipo !== perdedorRonda3;
-        });
-
-        // Actualizar el array de equipos actuales
-        var equiposArrayd2 = ganadoresRonda2Filtrados;
-
-        // Validar que haya al menos 4 equipos
-        if (equiposArrayd2.length < 4) {
-            alert("Por favor, selecciona al menos 4 equipos para generar el torneo.");
+        // Verificar que haya al menos dos ganadores para la Final
+        if (ganadoresRondaSemifinal.length < 2) {
+            alert("Por favor, selecciona al menos dos ganadores de la Ronda Semifinal.");
             return;
         }
 
-        // Generar el torneo y mostrar equipos actuales
-        console.log(equiposArrayd2);
-        
-        mostrarEquiposActuales(equiposArrayd2);
-        generarTorneo(equiposArrayd2);
-    }
+        var partidosFinal = generarPartidosFinal(ganadoresRondaSemifinal);
 
-    function generarTorneo(equipos) {
-        // Dividir el array en parejas para el cuadro de torneo
-        var equiposEnParejas = [];
-        for (var i = 0; i < equipos.length; i += 2) {
-            equiposEnParejas.push([equipos[i], equipos[i + 1]]);
+        var tablaFinalHTML = "<h2 class='mt-4'>Tabla de la Final</h2>";
+        tablaFinalHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
+        tablaFinalHTML += "<tr><th scope='col'>Partido</th><th scope='col'>Equipo A</th><th scope='col'>Equipo B</th><th scope='col'>Ganador</th></tr></thead><tbody>";
+
+        for (var i = 0; i < partidosFinal.length; i++) {
+            tablaFinalHTML += "<tr>";
+            tablaFinalHTML += "<td>" + partidosFinal[i].partido + "</td>";
+            tablaFinalHTML += "<td>" + partidosFinal[i].equipoA + "</td>";
+            tablaFinalHTML += "<td>" + partidosFinal[i].equipoB + "</td>";
+            tablaFinalHTML += "<td><select name='ganadorSelectFinal" + i + "'><option value=''>Seleccionar</option>";
+            tablaFinalHTML += "<option value='" + partidosFinal[i].equipoA + "'>" + partidosFinal[i].equipoA + "</option>";
+            tablaFinalHTML += "<option value='" + partidosFinal[i].equipoB + "'>" + partidosFinal[i].equipoB + "</option>";
+            tablaFinalHTML += "</select></td>";
+            tablaFinalHTML += "</tr>";
         }
 
-        // Estructura de datos para el cuadro de torneo
-        var data = {
-            teams: equiposEnParejas,
-            results: [
-                [[,],[,]],
-                [[1, 2]],
-                [[,]]
-            ]
-        };
-
-        // Generar el cuadro de torneo utilizando jQuery Bracket
-        $('#torneo').empty(); // Limpiar cualquier contenido previo
-        $('#torneo').bracket({
-            init: data,
-            skipConsolationRound: true,
-            onMatchClick: function (data) {
-                // Manejar clic en un partido (opcional)
-                console.log(data);
-            }
-        });
+        tablaFinalHTML += "</tbody></table>";
+        document.getElementById("Final").innerHTML = tablaFinalHTML;
+        document.getElementById("Final").style.display = "block";
     }
 
+    function obtenerGanadoresRondaSemifinal() {
+        var ganadoresRondaSemifinal = [];
 
-    function mostrarEquiposActuales(equipos) {
-        var tablaEquiposHTML = "<h2 class='mt-4'>Equipos Actuales</h2>";
-        tablaEquiposHTML += "<table class='table table-bordered mt-3'><thead class='thead-dark'>";
-        tablaEquiposHTML += "<tr><th scope='col'>#</th><th scope='col'>Nombre del Equipo</th></tr></thead><tbody>";
+        for (var i = 0; i < equiposArray.length / 2; i++) {
+            var ganadorSelect = document.getElementsByName('ganadorSelectSemifinal' + i)[0];
 
-        for (var i = 0; i < equipos.length; i++) {
-            tablaEquiposHTML += "<tr><th scope='row'>" + (i + 1) + "</th><td>" + equipos[i] + "</td></tr>";
-        }
+            // Asegúrate de que ganadorSelect no sea undefined antes de intentar acceder a sus opciones
+            if (ganadorSelect && ganadorSelect.options.length > 0) {
+                var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
 
-        tablaEquiposHTML += "</tbody></table>";
-        document.getElementById("tabladia2").innerHTML = tablaEquiposHTML;
-        document.getElementById("tabladia2").style.display = "block";
-    }
-
-    function obtenerPerdedorRonda3() {
-        var ganadorSelectRonda3 = document.getElementsByName('ganadorSelectRonda3')[0];
-        var ganador = ganadorSelectRonda3.value;
-
-        // Obtener todas las opciones del select
-        var opciones = Array.from(ganadorSelectRonda3.options).map(option => option.value);
-
-        // Filtrar las opciones para excluir al ganador seleccionado
-        var perdedores = opciones.filter(opcion => opcion !== '' && opcion !== ganador);
-
-        // Mostrar en consola tanto el ganador seleccionado como los perdedores
-        console.log('Ganador seleccionado:', ganador);
-        console.log('Perdedores:', perdedores);
-
-        var perdedoresString = perdedores.join(', ');
-
-        return perdedoresString; // Trim para eliminar espacios en blanco al principio y al final
-    }
-
-
-    function obtenerGanadoresRonda2() {
-        var ganadoresRonda2 = [];
-
-        for (var i = 0; i < equiposArray.length / 4; i++) {
-            var ganadorSelect = document.getElementsByName('ganadorSelectRonda2' + i)[0];
-            var ganador = ganadorSelect.options[ganadorSelect.selectedIndex].value;
-
-            if (ganador) {
-                ganadoresRonda2.push(ganador);
+                if (ganador) {
+                    ganadoresRondaSemifinal.push(ganador);
+                }
             }
         }
 
-        return ganadoresRonda2;
+        return ganadoresRondaSemifinal;
     }
 
-    window.onload = function () {
-            var storedContent = localStorage.getItem('htmlContent');
-            if (storedContent) {
-                document.body.innerHTML = storedContent;
-            }
-        };
+    function generarPartidosFinal(ganadoresRondaSemifinal) {
+        var partidosFinal = [];
 
-        // Función para guardar datos localmente antes de recargar la página (F5)
-        window.onbeforeunload = function () {
-            var currentContent = document.body.innerHTML;
-            localStorage.setItem('htmlContent', currentContent);
-        };
+        for (var i = 0; i < ganadoresRondaSemifinal.length / 2; i++) {
+            var equipoA = ganadoresRondaSemifinal[i];
+            var equipoB = ganadoresRondaSemifinal[ganadoresRondaSemifinal.length - 1 - i];
+            var partido = 'Partido ' + (i + 1);
+            partidosFinal.push({ partido: partido, equipoA: equipoA, equipoB: equipoB, ganador: '' });
+        }
+
+        return partidosFinal;
+    }
 </script>
 
+<button type="button" class="btn btn-primary" onclick="mostrarGanador()">Mostrar Ganador</button>
 
+<!-- Agrega un elemento para mostrar el nombre del ganador -->
+<div id="ganadorContainer" style="display: none;">
+    <h2 class="mt-4">Ganador</h2>
+    <p id="ganadorNombre"></p>
+</div>
+
+<script>
+    function mostrarGanador() {
+        var ganadorFinal = obtenerGanadorFinal();
+
+        // Verifica que haya un ganador
+        if (ganadorFinal) {
+            document.getElementById("ganadorNombre").innerHTML = "El ganador es: " + ganadorFinal;
+            document.getElementById("ganadorContainer").style.display = "block";
+        } else {
+            alert("Aún no se ha seleccionado un ganador de la ronda final.");
+        }
+    }
+
+    function obtenerGanadorFinal() {
+        // Cambiado el nombre del select para coincidir con el generado en la función generarFinal
+        var ganadorSelectFinal = document.getElementsByName('ganadorSelectFinal0')[0];
+
+        // Verifica que ganadorSelectFinal no sea undefined antes de intentar acceder a sus opciones
+        if (ganadorSelectFinal && ganadorSelectFinal.options.length > 0) {
+            var ganadorFinal = ganadorSelectFinal.options[ganadorSelectFinal.selectedIndex].value;
+            return ganadorFinal;
+        } else {
+            return null;
+        }
+    }
+</script>
 
     </div>
 </body>
